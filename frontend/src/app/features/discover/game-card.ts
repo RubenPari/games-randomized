@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import { Api, type RawgGameDetail, type RawgMovie, type RawgScreenshot } from '../../core/api';
-import { cropImage, platformsOf, releaseYear } from '../../core/games';
+import { resizeImage, platformsOf, releaseYear } from '../../core/games';
 import { DISLIKE_REASONS, type FeedbackReason, type FeedbackValue } from '../../core/recommendation';
 import { SaveButton } from '../../shared/game-tile';
 import { Icon } from '../../shared/icon';
@@ -23,7 +23,7 @@ export interface FeedbackEvent {
     @let g = game();
     <article class="overflow-hidden border-2 border-ink bg-white shadow-[8px_8px_0_var(--color-ink)]">
       <div class="grid md:grid-cols-12">
-        <div class="border-ink md:col-span-6 md:border-r-2">
+        <div class="border-ink md:col-span-6 md:border-r-2 md:bg-ink">
           <div class="aspect-video bg-ink/10">
             @if (activeImage(); as src) {
               <img [src]="src" [alt]="g.name" class="size-full object-cover" />
@@ -128,11 +128,11 @@ export interface FeedbackEvent {
             }
           </section>
 
-          @if (g.description_raw) {
+          @if (description(); as text) {
             <section class="mt-6 border-t-2 border-ink pt-5">
               <h3 class="ui-label">{{ 'card.about' | transloco }}</h3>
               <p class="mt-3 text-sm leading-7 whitespace-pre-line text-ink/75">
-                {{ expanded() || !longDescription() ? g.description_raw : g.description_raw.slice(0, preview) + '…' }}
+                {{ expanded() || !longDescription() ? text : text.slice(0, preview) + '…' }}
               </p>
               @if (longDescription()) {
                 <button
@@ -211,9 +211,11 @@ export class GameCard {
 
   protected readonly year = computed(() => releaseYear(this.game().released));
   protected readonly platforms = computed(() => platformsOf(this.game()).map((p) => p.name).join(' · '));
-  protected readonly longDescription = computed(() => (this.game().description_raw ?? '').length > DESCRIPTION_PREVIEW);
+  // description_raw keeps RAWG's markdown headings ("###Plot"); drop the hashes, keep the text.
+  protected readonly description = computed(() => (this.game().description_raw ?? '').replace(/^#+\s*/gm, '').trim());
+  protected readonly longDescription = computed(() => this.description().length > DESCRIPTION_PREVIEW);
   protected readonly activeImage = computed(() =>
-    cropImage(this.selectedShot() ?? this.game().background_image, 1280, 720),
+    resizeImage(this.selectedShot() ?? this.game().background_image, 1280),
   );
   protected readonly studios = computed(() => [
     ...(this.game().developers ?? []).map((d) => ({ ...d, key: `d${d.id}`, developer: true })),
@@ -240,6 +242,6 @@ export class GameCard {
   }
 
   protected crop(url: string): string | null {
-    return cropImage(url, 320, 180);
+    return resizeImage(url, 320);
   }
 }

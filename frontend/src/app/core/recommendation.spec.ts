@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RawgGame, RawgGameDetail, RawgPage } from './api';
-import { cropImage, toGamePayload } from './games';
+import { resizeImage, toGamePayload } from './games';
 import {
   buildProfile,
   feedbackRecord,
@@ -130,11 +130,18 @@ describe('helpers', () => {
     );
   });
 
-  it('crops only RAWG media urls', () => {
-    expect(cropImage('https://media.rawg.io/media/games/a.jpg', 600, 400)).toBe(
+  it('resizes RAWG media urls to a width RAWG actually serves', () => {
+    expect(resizeImage('https://media.rawg.io/media/games/a.jpg', 320)).toBe(
+      'https://media.rawg.io/media/resize/420/-/games/a.jpg',
+    );
+    expect(resizeImage('https://media.rawg.io/media/games/a.jpg', 1280)).toBe(
+      'https://media.rawg.io/media/resize/1280/-/games/a.jpg',
+    );
+    expect(resizeImage('https://media.rawg.io/media/games/a.jpg', 4000)).toBe('https://media.rawg.io/media/games/a.jpg');
+    expect(resizeImage('https://media.rawg.io/media/crop/600/400/games/a.jpg')).toBe(
       'https://media.rawg.io/media/crop/600/400/games/a.jpg',
     );
-    expect(cropImage('https://example.com/a.jpg')).toBe('https://example.com/a.jpg');
-    expect(cropImage(null)).toBeNull();
+    expect(resizeImage('https://example.com/a.jpg')).toBe('https://example.com/a.jpg');
+    expect(resizeImage(null)).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 import { Api, errorMessage, type CollectionKind, type RawgDeveloper, type RawgGameDetail } from '../core/api';
 import { Collections } from '../core/collections';
-import { cropImage, tileFromItem, tileFromRawg, type GameTile } from '../core/games';
+import { resizeImage, tileFromItem, tileFromRawg, type GameTile } from '../core/games';
 import { GameTileCard, SaveButton } from '../shared/game-tile';
 import { Icon } from '../shared/icon';
 
@@ -303,5 +303,5 @@ export class Developer {
     return { developer, games: games.results };
   });
   protected readonly tiles = computed(() => (this.data.value()?.games ?? []).map(tileFromRawg));
-  protected readonly banner = computed(() => cropImage(this.data.value()?.developer.image_background, 640, 360));
+  protected readonly banner = computed(() => resizeImage(this.data.value()?.developer.image_background, 1280));
 }

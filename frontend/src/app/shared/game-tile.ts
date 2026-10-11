@@ -4,7 +4,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 import { Api, errorMessage, type RawgGameDetail } from '../core/api';
 import { Collections } from '../core/collections';
-import { cropImage, releaseYear, toGamePayload, type GameTile } from '../core/games';
+import { resizeImage, releaseYear, toGamePayload, type GameTile } from '../core/games';
 import { Icon } from './icon';
 
 /** Toggles a game in the wishlist; fetches details first when only the id is known. */
@@ -105,6 +105,6 @@ export class SaveButton {
 })
 export class GameTileCard {
   readonly game = input.required<GameTile>();
-  protected readonly image = computed(() => cropImage(this.game().image, 640, 360));
+  protected readonly image = computed(() => resizeImage(this.game().image, 640));
   protected readonly year = computed(() => releaseYear(this.game().released));
 }

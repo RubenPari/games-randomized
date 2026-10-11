@@ -11,11 +11,16 @@ export interface GameTile {
   genres: NamedRef[];
 }
 
-/** RAWG serves resized images when "crop/W/H/" is inserted after "/media/". */
-export function cropImage(url: string | null | undefined, width = 640, height = 360): string | null {
+// RAWG only serves a few sizes; others redirect to api.rawg.io and 404. CSS object-cover does the cropping.
+const RESIZE_WIDTHS = [200, 420, 640, 1280];
+
+/** Smallest RAWG-supported "resize/W/-/" variant at least `width` wide (original if wider than all). */
+export function resizeImage(url: string | null | undefined, width = 640): string | null {
   if (!url) return null;
-  if (!url.startsWith('https://media.rawg.io/media/') || url.includes('/media/crop/')) return url;
-  return url.replace('https://media.rawg.io/media/', `https://media.rawg.io/media/crop/${width}/${height}/`);
+  const prefix = 'https://media.rawg.io/media/';
+  const size = RESIZE_WIDTHS.find((w) => w >= width);
+  if (!size || !url.startsWith(prefix) || /\/media\/(crop|resize)\//.test(url)) return url;
+  return url.replace(prefix, `${prefix}resize/${size}/-/`);
 }
 
 export function releaseYear(released: string | null | undefined): number | null {
