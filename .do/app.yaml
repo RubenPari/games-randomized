@@ -17,8 +17,8 @@ services:
         scope: RUN_TIME
         type: GENERAL
       # The App Platform edge sets DO-Connecting-IP to the real client address.
-      - key: CLIENT_IP
-        value: $http_do_connecting_ip
+      - key: TRUST_DO_CONNECTING_IP
+        value: '1'
         scope: RUN_TIME
         type: GENERAL
 

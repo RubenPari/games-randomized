@@ -1,3 +1,11 @@
+# Client address for rate limiting. Only behind DigitalOcean's edge (TRUST_DO_CONNECTING_IP=1 in
+# .do/app.yaml) is DO-Connecting-IP trusted: the edge sets it. Elsewhere a client could forge it,
+# so the TCP peer is used. The flag is a plain 0/1 because App Platform mangles "$" in env values.
+map "${TRUST_DO_CONNECTING_IP}" $client_ip {
+    default $remote_addr;
+    "1"     $http_do_connecting_ip;
+}
+
 server {
     listen 80;
     server_name _;
@@ -26,10 +34,7 @@ server {
     location /api/ {
         proxy_pass http://${BACKEND_UPSTREAM}/api/;
         proxy_set_header Host $host;
-        # Client address for rate limiting. CLIENT_IP is "$remote_addr" by default; only behind
-        # DigitalOcean's edge (.do/app.yaml) is it "$http_do_connecting_ip", a header the edge sets.
-        # Never trust a request header without a proxy in front that owns it.
-        proxy_set_header X-Real-IP ${CLIENT_IP};
+        proxy_set_header X-Real-IP $client_ip;
         proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Forwarded-Proto $scheme;
     }
