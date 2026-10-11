@@ -1,0 +1,94 @@
+name: games-randomized
+region: fra
+
+services:
+  - name: web
+    git:
+      repo_clone_url: https://github.com/RubenPari/games-randomized.git
+      branch: main
+    source_dir: frontend
+    dockerfile_path: frontend/Dockerfile
+    http_port: 80
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: BACKEND_UPSTREAM
+        value: api:8000
+        scope: RUN_TIME
+        type: GENERAL
+
+  - name: api
+    git:
+      repo_clone_url: https://github.com/RubenPari/games-randomized.git
+      branch: main
+    source_dir: backend
+    dockerfile_path: backend/Dockerfile
+    internal_ports: [8000]
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /api/health
+      port: 8000
+      initial_delay_seconds: 10
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    alerts:
+      - rule: CPU_UTILIZATION
+        operator: GREATER_THAN
+        value: 80
+        window: FIVE_MINUTES
+    envs:
+      - key: PORT
+        value: '8000'
+        scope: RUN_TIME
+        type: GENERAL
+      - key: DATABASE_URL
+        value: ${games-db.DATABASE_URL}
+        scope: RUN_TIME
+        type: GENERAL
+      - key: DB_SSL_CA
+        value: ${games-db.CA_CERT}
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_SECRET
+        value: ${JWT_SECRET}
+        scope: RUN_TIME
+        type: SECRET
+      - key: RAWG_API_KEY
+        value: ${RAWG_API_KEY}
+        scope: RUN_TIME
+        type: SECRET
+      - key: FRONTEND_URL
+        value: ${APP_URL}
+        scope: RUN_TIME
+        type: GENERAL
+      - key: AI_GATEWAY_URL
+        value: ${AI_GATEWAY_URL}
+        scope: RUN_TIME
+        type: GENERAL
+      - key: AI_GATEWAY_KEY
+        value: ${AI_GATEWAY_KEY}
+        scope: RUN_TIME
+        type: SECRET
+
+databases:
+  - name: games-db
+    engine: PG
+    version: '16'
+    production: true
+    cluster_name: games-randomized-db
+    db_name: games_randomized
+    db_user: doadmin
+
+alerts:
+  - rule: DEPLOYMENT_FAILED
+
+ingress:
+  rules:
+    - component:
+        name: web
+      match:
+        path:
+          prefix: /

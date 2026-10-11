@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: games_randomized
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 8
+
+  api:
+    build: ./backend
+    environment:
+      PORT: '8000'
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE: games_randomized
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (min 32 characters)}
+      RAWG_API_KEY: ${RAWG_API_KEY:?set RAWG_API_KEY in .env}
+      FRONTEND_URL: http://localhost
+      AI_GATEWAY_URL: ${AI_GATEWAY_URL:-}
+      AI_GATEWAY_KEY: ${AI_GATEWAY_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - '8000'
+
+  web:
+    build: ./frontend
+    ports:
+      - '80:80'
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

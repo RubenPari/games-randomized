@@ -1,0 +1,131 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-paper: #f7f3e8;
+  --color-ink: #15133c;
+  --color-violet: #5b3fe0;
+  --color-yellow: #ffd166;
+  --color-coral: #ff6b5e;
+  --color-success: #247a5a;
+  --color-danger: #b83a45;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-sans: Manrope, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+@layer base {
+  html {
+    min-width: 320px;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-paper font-sans text-ink antialiased;
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-violet);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    color: var(--color-ink);
+    background: var(--color-yellow);
+  }
+}
+
+@layer components {
+  .ui-button {
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 border-2 border-ink px-5 py-2.5 text-sm font-bold;
+    border-radius: 0.625rem;
+    box-shadow: 3px 3px 0 var(--color-ink);
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      background-color 160ms ease;
+  }
+  .ui-button:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 var(--color-ink);
+  }
+  .ui-button:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--color-ink);
+  }
+  .ui-button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .ui-button--primary {
+    @apply bg-violet text-white;
+  }
+  .ui-button--secondary {
+    @apply bg-yellow text-ink;
+  }
+  .ui-button--quiet {
+    @apply bg-paper text-ink;
+    box-shadow: none;
+  }
+  .ui-button--quiet:hover:not(:disabled) {
+    @apply bg-yellow;
+    box-shadow: none;
+    transform: none;
+  }
+  .ui-button--danger {
+    @apply bg-danger text-white;
+  }
+
+  .ui-panel {
+    @apply border-2 border-ink bg-paper;
+    border-radius: 0.875rem;
+    box-shadow: 6px 6px 0 var(--color-ink);
+  }
+
+  .ui-field {
+    @apply min-h-11 w-full border-2 border-ink bg-white px-3 py-2 text-ink placeholder:text-ink/50;
+    border-radius: 0.5rem;
+  }
+
+  .ui-label {
+    @apply font-mono text-xs font-semibold tracking-wider uppercase;
+  }
+
+  .ui-eyebrow {
+    @apply font-mono text-xs font-semibold tracking-[0.18em] text-violet uppercase;
+  }
+
+  .ui-chip {
+    @apply inline-flex min-h-8 items-center gap-1.5 border border-ink bg-white px-3 py-1 font-mono text-xs font-semibold tracking-wide text-ink uppercase;
+    border-radius: 9999px;
+  }
+
+  .ui-spinner {
+    @apply size-5 animate-spin rounded-full border-2 border-current border-r-transparent;
+  }
+
+  .frame-enter {
+    animation: frame-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes frame-enter {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
