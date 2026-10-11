@@ -83,9 +83,9 @@ databases:
     engine: PG
     version: '16'
     production: true
-    cluster_name: games-randomized-db
+    cluster_name: film-randomized-db
     db_name: games_randomized
-    db_user: doadmin
+    db_user: games_app
 
 alerts:
   - rule: DEPLOYMENT_FAILED

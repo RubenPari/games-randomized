@@ -37,4 +37,4 @@ docker compose up --build   # http://localhost
 
 ## Deployment
 
-DigitalOcean App Platform (`.do/app.yaml`): `web` (nginx, proxies `/api` to `api:8000`) + `api` + managed Postgres `games-db` (cluster `games-randomized-db` must exist). `.github/workflows/deploy-digitalocean.yml` tests then deploys on push to `main`. Secrets: `DIGITALOCEAN_ACCESS_TOKEN`, `JWT_SECRET`, `RAWG_API_KEY`, optional `AI_GATEWAY_URL`, `AI_GATEWAY_KEY`.
+DigitalOcean App Platform (`.do/app.yaml`): `web` (nginx, proxies `/api` to `api:8000`) + `api` + managed Postgres `games-db` = database `games_randomized`, user `games_app` on the shared cluster `film-randomized-db` (dedicated user so this app cannot touch the other DBs; it was granted `ALL ON SCHEMA public`). `.github/workflows/deploy-digitalocean.yml` tests then deploys on push to `main`. Secrets: `DIGITALOCEAN_ACCESS_TOKEN`, `JWT_SECRET`, `RAWG_API_KEY`, optional `AI_GATEWAY_URL`, `AI_GATEWAY_KEY`.

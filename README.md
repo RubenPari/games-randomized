@@ -32,7 +32,7 @@ cd frontend && npm test && npm run build
 
 ## Deploy (DigitalOcean App Platform)
 
-1. Create the managed Postgres cluster `games-randomized-db` (or change `databases` in `.do/app.yaml`).
+1. The app uses database `games_randomized` (user `games_app`, owns nothing else) on the shared cluster `film-randomized-db`. Both must exist and `games_app` needs `GRANT ALL ON SCHEMA public` (PG16 does not grant it by default).
 2. Add GitHub secrets: `DIGITALOCEAN_ACCESS_TOKEN`, `JWT_SECRET`, `RAWG_API_KEY`, optionally `AI_GATEWAY_URL` / `AI_GATEWAY_KEY`.
 3. Push to `main`: the workflow runs the tests and deploys `.do/app.yaml`.
 
