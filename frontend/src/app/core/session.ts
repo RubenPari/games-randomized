@@ -51,6 +51,12 @@ export class Session {
     }
   }
 
+  /** Swaps in a token reissued by the server (e.g. after a password change revoked the old one). */
+  replaceToken(token: string): void {
+    writeToken(token);
+    this.token.set(token);
+  }
+
   clear(): void {
     writeToken(null);
     this.token.set(null);

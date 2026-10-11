@@ -87,40 +87,63 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"newPassword" validate:"required,min=8,max=72"`
 }
 
-func (h *authHandler) issueToken(userID string) (string, error) {
+type tokenClaims struct {
+	jwt.RegisteredClaims
+	// Version must match users.token_version; changing the password bumps it and revokes old tokens.
+	Version int `json:"ver"`
+}
+
+func (h *authHandler) issueToken(userID string, version int) (string, error) {
 	now := time.Now()
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Subject:   userID,
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(accessTokenTTL)),
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, tokenClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(accessTokenTTL)),
+		},
+		Version: version,
 	}).SignedString(h.secret)
 }
 
-func (h *authHandler) parseToken(raw string) (string, error) {
-	claims := &jwt.RegisteredClaims{}
+func (h *authHandler) parseToken(raw string) (*tokenClaims, error) {
+	claims := &tokenClaims{}
 	_, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) { return h.secret, nil },
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if claims.Subject == "" {
-		return "", errors.New("token has no subject")
+		return nil, errors.New("token has no subject")
 	}
-	return claims.Subject, nil
+	return claims, nil
 }
 
+// requireUser checks the signature and that the user still exists with the same token version.
 func (h *authHandler) requireUser(c fiber.Ctx) error {
+	unauthorized := fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
 	raw, ok := strings.CutPrefix(c.Get(fiber.HeaderAuthorization), "Bearer ")
 	if !ok || raw == "" {
-		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+		return unauthorized
 	}
-	userID, err := h.parseToken(raw)
+	claims, err := h.parseToken(raw)
 	if err != nil {
-		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+		return unauthorized
 	}
-	c.Locals("userID", userID)
+	var version int
+	err = h.db.QueryRow(c, `SELECT token_version FROM users WHERE id = $1`, claims.Subject).Scan(&version)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && version != claims.Version) {
+		return unauthorized
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" { // subject is not a uuid
+			return unauthorized
+		}
+		return err
+	}
+	c.Locals("userID", claims.Subject)
 	return c.Next()
 }
 
@@ -153,7 +176,7 @@ func (h *authHandler) register(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return h.respondWithToken(c, userResponse{ID: id, Username: req.Username, Email: email})
+	return h.respondWithToken(c, userResponse{ID: id, Username: req.Username, Email: email}, 0)
 }
 
 func (h *authHandler) login(c fiber.Ctx) error {
@@ -163,9 +186,10 @@ func (h *authHandler) login(c fiber.Ctx) error {
 	}
 	var u userResponse
 	var hash string
+	var version int
 	err := h.db.QueryRow(c,
-		`SELECT id, username, email, password FROM users WHERE username = $1`, req.Username,
-	).Scan(&u.ID, &u.Username, &u.Email, &hash)
+		`SELECT id, username, email, password, token_version FROM users WHERE username = $1`, req.Username,
+	).Scan(&u.ID, &u.Username, &u.Email, &hash, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
 		return fiber.NewError(fiber.StatusUnauthorized, "Invalid credentials")
@@ -176,11 +200,11 @@ func (h *authHandler) login(c fiber.Ctx) error {
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil {
 		return fiber.NewError(fiber.StatusUnauthorized, "Invalid credentials")
 	}
-	return h.respondWithToken(c, u)
+	return h.respondWithToken(c, u, version)
 }
 
-func (h *authHandler) respondWithToken(c fiber.Ctx, u userResponse) error {
-	token, err := h.issueToken(u.ID)
+func (h *authHandler) respondWithToken(c fiber.Ctx, u userResponse, version int) error {
+	token, err := h.issueToken(u.ID, version)
 	if err != nil {
 		return err
 	}
@@ -222,10 +246,17 @@ func (h *authHandler) changePassword(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	if _, err := h.db.Exec(c,
-		`UPDATE users SET password = $1, updated_at = now() WHERE id = $2`, string(newHash), userID,
-	); err != nil {
+	var version int
+	if err := h.db.QueryRow(c,
+		`UPDATE users SET password = $1, token_version = token_version + 1, updated_at = now()
+		 WHERE id = $2 RETURNING token_version`, string(newHash), userID,
+	).Scan(&version); err != nil {
 		return err
 	}
-	return c.JSON(fiber.Map{"message": "Password changed successfully"})
+	// Every other session is now revoked; hand this one a fresh token so it stays logged in.
+	token, err := h.issueToken(userID, version)
+	if err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{"message": "Password changed successfully", "token": token})
 }

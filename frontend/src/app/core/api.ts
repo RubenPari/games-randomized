@@ -162,7 +162,7 @@ export class Api {
     return this.get<User>('/auth/me');
   }
   changePassword(currentPassword: string, newPassword: string) {
-    return this.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword });
+    return this.post<{ message: string; token: string }>('/auth/change-password', { currentPassword, newPassword });
   }
 
   // Collections

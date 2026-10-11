@@ -16,7 +16,9 @@ const (
 	rawgBaseURL  = "https://api.rawg.io/api"
 	listCacheTTL = 10 * time.Minute
 	itemCacheTTL = 24 * time.Hour
-	maxCacheSize = 2000
+	// Cache keys come from client query params, so bound memory by bytes, not entry count.
+	maxCacheBytes = 32 << 20
+	maxEntryBytes = 512 << 10
 )
 
 // Only these query params reach RAWG; anything else (including "key") is dropped.
@@ -48,8 +50,9 @@ type rawgProxy struct {
 	base   string
 	client *http.Client
 
-	mu    sync.Mutex
-	cache map[string]cacheEntry
+	mu         sync.Mutex
+	cache      map[string]cacheEntry
+	cacheBytes int
 }
 
 func newRAWGProxy(key string) *rawgProxy {
@@ -174,10 +177,19 @@ func (p *rawgProxy) cached(key string) (cacheEntry, bool) {
 func (p *rawgProxy) store(key string, e cacheEntry, ttl time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	size := len(key) + len(e.body)
+	if size > maxEntryBytes {
+		return
+	}
+	if old, ok := p.cache[key]; ok {
+		p.cacheBytes -= len(key) + len(old.body)
+	}
 	// ponytail: in-process cache wiped when full; move to Redis/LRU if the api runs >1 instance.
-	if len(p.cache) >= maxCacheSize {
+	if p.cacheBytes+size > maxCacheBytes {
 		clear(p.cache)
+		p.cacheBytes = 0
 	}
 	e.expires = time.Now().Add(ttl)
 	p.cache[key] = e
+	p.cacheBytes += size
 }

@@ -1,3 +1,10 @@
+# Client address for rate limiting. DigitalOcean's edge sets DO-Connecting-IP; elsewhere
+# (docker compose) fall back to the TCP peer. Never forward client-supplied X-Forwarded-For.
+map $http_do_connecting_ip $client_ip {
+    ""      $remote_addr;
+    default $http_do_connecting_ip;
+}
+
 server {
     listen 80;
     server_name _;
@@ -26,8 +33,8 @@ server {
     location /api/ {
         proxy_pass http://${BACKEND_UPSTREAM}/api/;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $client_ip;
+        proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 

@@ -153,8 +153,9 @@ func newApp(c config, pool *pgxpool.Pool) *fiber.App {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: errorHandler,
 		BodyLimit:    1 << 20,
-		// ponytail: leftmost X-Forwarded-For is client-controlled; good enough for rate limiting, not for auth.
-		ProxyHeader:        fiber.HeaderXForwardedFor,
+		// nginx overwrites X-Real-IP with the client address (see nginx.conf.template), so clients
+		// cannot spoof it; it is only trusted when the request comes from a private-network proxy.
+		ProxyHeader:        "X-Real-IP",
 		TrustProxy:         true,
 		TrustProxyConfig:   fiber.TrustProxyConfig{Private: true, Loopback: true},
 		EnableIPValidation: true,

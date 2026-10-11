@@ -158,7 +158,8 @@ export class Profile {
     this.busy.set(true);
     this.error.set(null);
     try {
-      await this.api.changePassword(this.current, this.next);
+      const { token } = await this.api.changePassword(this.current, this.next);
+      this.session.replaceToken(token);
       this.current = this.next = this.confirm = '';
       this.success.set(true);
     } catch (error) {

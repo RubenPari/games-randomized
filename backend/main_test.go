@@ -20,12 +20,12 @@ import (
 
 func TestTokenRoundTripAndRejection(t *testing.T) {
 	h := &authHandler{secret: []byte(strings.Repeat("s", 32))}
-	tok, err := h.issueToken("user-1")
+	tok, err := h.issueToken("user-1", 3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sub, err := h.parseToken(tok); err != nil || sub != "user-1" {
-		t.Fatalf("valid token: sub=%q err=%v", sub, err)
+	if claims, err := h.parseToken(tok); err != nil || claims.Subject != "user-1" || claims.Version != 3 {
+		t.Fatalf("valid token: claims=%+v err=%v", claims, err)
 	}
 
 	tampered := tok[:len(tok)-2] + "xx"
@@ -62,6 +62,10 @@ func TestRAWGProxyFiltersParamsAndCaches(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		if r.URL.Path == "/games/7" {
+			_, _ = io.WriteString(w, strings.Repeat("x", maxEntryBytes+1))
+			return
+		}
 		_, _ = io.WriteString(w, `{"count":1,"results":[]}`)
 	}))
 	defer upstream.Close()
@@ -96,6 +100,16 @@ func TestRAWGProxyFiltersParamsAndCaches(t *testing.T) {
 	get("/games?page=2&genres=4") // same params, different order: cache hit
 	if hits.Load() != 1 {
 		t.Fatalf("expected cache hit, upstream hits=%d", hits.Load())
+	}
+
+	before := hits.Load()
+	get("/games/7")
+	get("/games/7")
+	if hits.Load()-before != 2 {
+		t.Fatal("oversized response was cached")
+	}
+	if p.cacheBytes > maxCacheBytes {
+		t.Fatalf("cache over budget: %d", p.cacheBytes)
 	}
 
 	if code := get("/games/404"); code != http.StatusNotFound {
@@ -185,12 +199,40 @@ func TestCollectionsFlow(t *testing.T) {
 		`{"currentPassword":"wrong-pass","newPassword":"newpassword123"}`, nil); code != 400 {
 		t.Fatalf("wrong current password %d", code)
 	}
+	var changed struct {
+		Token string `json:"token"`
+	}
 	if code := call("POST", "/api/auth/change-password", login.Token,
-		`{"currentPassword":"password123","newPassword":"newpassword123"}`, nil); code != 200 {
+		`{"currentPassword":"password123","newPassword":"newpassword123"}`, &changed); code != 200 {
 		t.Fatalf("change password %d", code)
+	}
+	if code := call("GET", "/api/auth/me", login.Token, "", nil); code != 401 {
+		t.Fatalf("token issued before password change still accepted: %d", code)
+	}
+	if code := call("GET", "/api/auth/me", changed.Token, "", nil); code != 200 {
+		t.Fatalf("token returned by change-password rejected: %d", code)
 	}
 	if code := call("POST", "/api/auth/login", "",
 		fmt.Sprintf(`{"username":%q,"password":"newpassword123"}`, username), nil); code != 200 {
 		t.Fatalf("login with new password %d", code)
+	}
+}
+
+// Rotating X-Forwarded-For must not reset the 5/min auth limiter.
+func TestAuthRateLimitIgnoresForwardedFor(t *testing.T) {
+	app := newApp(config{JWTSecret: strings.Repeat("t", 32), RAWGKey: "unused", FrontendURL: "http://localhost"}, nil)
+	last := 0
+	for i := range 6 {
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("203.0.113.%d", i))
+		res, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = res.StatusCode
+	}
+	if last != http.StatusTooManyRequests {
+		t.Fatalf("6th login attempt got %d, want 429", last)
 	}
 }
